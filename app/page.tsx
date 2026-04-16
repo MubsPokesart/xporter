@@ -58,10 +58,12 @@ export default function Home() {
     }
   };
 
-  const normalizedInput = /^(x\.com|twitter\.com)\//i.test(url.trim())
-    ? `https://${url.trim()}`
-    : url.trim();
+  const trimmedUrl = url.trim();
+  const normalizedInput = /^(x\.com|twitter\.com)\//i.test(trimmedUrl)
+    ? `https://${trimmedUrl}`
+    : trimmedUrl;
   const isValidUrl = validateTweetUrl(normalizedInput);
+  const showHint = trimmedUrl.length > 0 && !isValidUrl;
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8 sm:py-8">
@@ -100,8 +102,10 @@ export default function Home() {
                   </svg>
                 </button>
               </div>
-              <p className="text-[10px] text-ink-4 mt-3 tracking-[0.02em]">
-                extracts structured markdown from tweets, threads, and articles
+              <p className={`text-[10px] mt-3 tracking-[0.02em] ${showHint ? "text-red-400" : "text-ink-4"}`}>
+                {showHint
+                  ? "Paste a link like x.com/user/status/123"
+                  : "extracts structured markdown from tweets, threads, and articles"}
               </p>
               <button type="submit" className="sr-only">Extract</button>
             </form>
@@ -144,6 +148,11 @@ export default function Home() {
               </button>
             </div>
             <button type="submit" className="sr-only">Extract</button>
+            {showHint && (
+              <p className="text-[10px] text-red-400 mt-2 tracking-[0.02em]">
+                Paste a link like x.com/user/status/123
+              </p>
+            )}
           </form>
 
           {/* Action strip — between input and content, always visible */}

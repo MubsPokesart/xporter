@@ -1,6 +1,6 @@
 // lib/url.ts
 const TWEET_URL_PATTERN =
-  /^https?:\/\/(x\.com|twitter\.com)\/\w+\/status\/\d+(\/[a-zA-Z0-9_/]*)?$/;
+  /^https?:\/\/(x\.com|twitter\.com)\/\w+\/status\/\d+(\/[a-zA-Z0-9_/]*)?(\?[^\s]*)?$/;
 
 export function validateTweetUrl(url: string): boolean {
   if (!url) return false;
