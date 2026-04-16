@@ -44,12 +44,24 @@ export default function Home() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (url.trim()) {
-      extract(url.trim());
+    const trimmed = url.trim();
+    if (!trimmed) return;
+
+    // Auto-prepend https:// for bare x.com/twitter.com links
+    const resolved = /^(x\.com|twitter\.com)\//i.test(trimmed)
+      ? `https://${trimmed}`
+      : trimmed;
+
+    if (validateTweetUrl(resolved)) {
+      setUrl(resolved);
+      extract(resolved);
     }
   };
 
-  const isValidUrl = validateTweetUrl(url.trim());
+  const normalizedInput = /^(x\.com|twitter\.com)\//i.test(url.trim())
+    ? `https://${url.trim()}`
+    : url.trim();
+  const isValidUrl = validateTweetUrl(normalizedInput);
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8 sm:py-8">
@@ -65,7 +77,7 @@ export default function Home() {
             <form onSubmit={handleSubmit}>
               <div className="relative">
                 <input
-                  type="url"
+                  type="text" inputMode="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="x.com/user/status/..."
@@ -109,7 +121,7 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="mb-6 sm:mb-8">
             <div className="relative w-full sm:max-w-[520px]">
               <input
-                type="url"
+                type="text" inputMode="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="x.com/user/status/..."
