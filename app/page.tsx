@@ -91,6 +91,13 @@ export default function Home() {
             className="w-full sm:max-w-[520px] bg-void border border-border-emphasis px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-3 font-sans outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 mb-6 sm:mb-8"
           />
 
+          {/* Action strip — between input and content, always visible */}
+          {state === "result" && data && (
+            <div className="mb-6">
+              <Actions markdown={markdown} data={data} />
+            </div>
+          )}
+
           {state === "loading" && (
             <div className="flex flex-col sm:flex-row gap-6">
               {/* Skeleton: content preview */}
@@ -164,8 +171,6 @@ function ResultView({
         </div>
       </div>
 
-      {/* Actions */}
-      <Actions markdown={markdown} data={data} />
     </>
   );
 }
@@ -214,10 +219,10 @@ function Actions({
   }, [handleDownload]);
 
   return (
-    <div className="flex flex-wrap gap-3 items-center">
+    <div className="flex flex-wrap sm:flex-nowrap gap-3 items-center">
       <button
         onClick={handleDownload}
-        className="bg-ink text-void px-5 sm:px-7 py-3.5 text-[13px] font-semibold tracking-[0.03em] flex items-center gap-2 min-h-[44px] hover:bg-white active:bg-ink/80 outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 cursor-pointer"
+        className="flex-1 sm:flex-none bg-ink text-void px-5 sm:px-7 py-3.5 text-[13px] font-semibold tracking-[0.03em] flex items-center justify-center gap-2 min-h-[44px] hover:bg-white active:bg-ink/80 outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 cursor-pointer"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
@@ -233,7 +238,7 @@ function Actions({
 
       <button
         onClick={handleCopy}
-        className="border border-border-emphasis text-ink-2 px-5 sm:px-7 py-3.5 text-[13px] font-medium tracking-[0.03em] flex items-center gap-2 min-h-[44px] hover:border-ink-3 hover:text-ink/70 active:text-ink-3 outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 cursor-pointer"
+        className="flex-1 sm:flex-none border border-border-emphasis text-ink-2 px-5 sm:px-7 py-3.5 text-[13px] font-medium tracking-[0.03em] flex items-center justify-center gap-2 min-h-[44px] hover:border-ink-3 hover:text-ink/70 active:text-ink-3 outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 cursor-pointer"
       >
         {copied ? (
           <>
