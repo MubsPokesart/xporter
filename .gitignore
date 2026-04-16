@@ -49,6 +49,9 @@ skills-lock.json
 # design system config
 .interface-design/
 
+# crash artifacts
+*.stackdump
+
 # dev scripts & test output
 scripts/extraction-results.md
 

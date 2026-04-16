@@ -6,6 +6,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "xporter",
   description: "tweets to knowledge",
+  icons: {
+    icon: "/xporter.svg",
+  },
 };
 
 export default function RootLayout({

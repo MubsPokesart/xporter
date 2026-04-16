@@ -7,7 +7,17 @@ import { cleanText } from "./cleaner";
 let _browser: Browser | null = null;
 async function getBrowser(): Promise<Browser> {
   if (!_browser || !_browser.isConnected()) {
-    _browser = await chromium.launch({ headless: true });
+    // Use system Chromium when available (Docker, ARM64 Linux)
+    const systemChromium =
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+      (process.arch === "arm64" && process.platform === "linux"
+        ? "/usr/bin/chromium-browser"
+        : undefined);
+
+    _browser = await chromium.launch({
+      headless: true,
+      ...(systemChromium ? { executablePath: systemChromium } : {}),
+    });
   }
   return _browser;
 }

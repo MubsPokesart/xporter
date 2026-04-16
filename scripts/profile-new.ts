@@ -72,7 +72,7 @@ async function main() {
   ];
 
   console.log("Profiling optimized pipeline...\n");
-  const results = [];
+  const results: { navigation: number; hydration: number; other: number; total: number }[] = [];
   for (const u of urls) {
     const r = await profile(normalizeUrl(u));
     results.push(r);
