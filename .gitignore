@@ -51,3 +51,6 @@ skills-lock.json
 
 # dev scripts & test output
 scripts/extraction-results.md
+
+# brainstorm outputs
+docs/
