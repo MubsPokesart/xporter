@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { TweetData } from "@/lib/types";
+import { validateTweetUrl } from "@/lib/url";
 
 type AppState = "empty" | "loading" | "result" | "error";
 
@@ -41,11 +42,14 @@ export default function Home() {
     }
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && url.trim()) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (url.trim()) {
       extract(url.trim());
     }
   };
+
+  const isValidUrl = validateTweetUrl(url.trim());
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8 sm:py-8">
@@ -58,16 +62,37 @@ export default function Home() {
             <p className="text-[11px] text-ink-3 mt-1 mb-10">
               tweets to knowledge
             </p>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Paste tweet URL"
-              aria-label="Tweet URL"
-              autoFocus
-              className="w-full bg-void border border-border-emphasis px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-3 font-sans outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2"
-            />
+            <form onSubmit={handleSubmit}>
+              <div className="relative">
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="x.com/user/status/..."
+                  aria-label="Tweet URL"
+                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  className="w-full bg-void border border-border-emphasis px-4 pr-12 py-3.5 text-base sm:text-[13px] text-ink placeholder:text-ink-4 placeholder:font-mono font-sans outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 min-h-[48px]"
+                />
+                <button
+                  type="submit"
+                  disabled={!isValidUrl}
+                  aria-label="Extract tweet"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-ink-4 hover:text-ink disabled:text-ink-4 disabled:cursor-default cursor-pointer transition-colors outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M3 8h10m0 0L9 4m4 4L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              <p className="text-[10px] text-ink-4 mt-3 tracking-[0.02em]">
+                extracts structured markdown from tweets, threads, and articles
+              </p>
+              <button type="submit" className="sr-only">Extract</button>
+            </form>
           </div>
         </div>
       ) : (
@@ -81,15 +106,33 @@ export default function Home() {
           </div>
 
           {/* Input */}
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Paste tweet URL"
-            aria-label="Tweet URL"
-            className="w-full sm:max-w-[520px] bg-void border border-border-emphasis px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-3 font-sans outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 mb-6 sm:mb-8"
-          />
+          <form onSubmit={handleSubmit} className="mb-6 sm:mb-8">
+            <div className="relative w-full sm:max-w-[520px]">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="x.com/user/status/..."
+                aria-label="Tweet URL"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                className="w-full bg-void border border-border-emphasis px-4 pr-12 py-3.5 text-base sm:text-[13px] text-ink placeholder:text-ink-4 placeholder:font-mono font-sans outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2 min-h-[48px]"
+              />
+              <button
+                type="submit"
+                disabled={!isValidUrl}
+                aria-label="Extract tweet"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-ink-4 hover:text-ink disabled:text-ink-4 disabled:cursor-default cursor-pointer transition-colors outline-none focus:outline-2 focus:outline-border-focus focus:outline-offset-2"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8h10m0 0L9 4m4 4L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <button type="submit" className="sr-only">Extract</button>
+          </form>
 
           {/* Action strip — between input and content, always visible */}
           {state === "result" && data && (
@@ -118,7 +161,10 @@ export default function Home() {
           )}
 
           {state === "error" && (
-            <p role="alert" className="text-ink-2 text-[13px]">{error}</p>
+            <div role="alert" className="text-[13px]">
+              <p className="text-ink-2">{error}</p>
+              <p className="text-ink-4 mt-2">Check the URL and try again</p>
+            </div>
           )}
 
           {state === "result" && data && (

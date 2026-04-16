@@ -12,8 +12,8 @@
   --color-border-emphasis: rgba(255, 255, 255, 0.12);
   --color-border-focus: rgba(255, 255, 255, 0.5);
 
-  --font-sans: -apple-system, "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Courier New", "Cascadia Code", monospace;
+  --font-sans: var(--font-geist-sans), -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Code", monospace;
 }
 
 body {
