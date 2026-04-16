@@ -66,6 +66,18 @@ describe("toMarkdown", () => {
     expect(md).toContain("mentions: []");
   });
 
+  it("does not wikilink code decorators or metric names", () => {
+    const tweet: TweetData = {
+      ...baseTweet,
+      content: "Use @app.route() for Flask. Measure Pass@k scores. Email user@domain.com",
+    };
+    const md = toMarkdown(tweet);
+    const body = md.split("---")[2].trim();
+    expect(body).not.toContain("[[@app]]");
+    expect(body).not.toContain("[[@k]]");
+    expect(body).not.toContain("[[@domain]]");
+  });
+
   it("handles thread content with horizontal rules", () => {
     const tweet: TweetData = {
       ...baseTweet,

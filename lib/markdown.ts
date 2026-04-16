@@ -3,9 +3,10 @@ import type { TweetData } from "./types";
 function wikilinkBody(content: string): string {
   let result = content;
   // Wrap @mentions in wikilinks: @user → [[@user]]
-  result = result.replace(/(?<!\[)@(\w+)/g, "[[@$1]]");
-  // Wrap #hashtags in wikilinks: #topic → [[topic]]
-  result = result.replace(/#(\w+)/g, "[[$1]]");
+  // Lookbehind skips emails (user@domain), decorators (@app.route), metrics (Pass@k)
+  result = result.replace(/(?<![.\w@])@([A-Za-z_]\w{0,14})(?!\s*[(.])/g, "[[@$1]]");
+  // Wrap #hashtags in wikilinks: #topic → [[topic]] (skip numeric-only like #1)
+  result = result.replace(/#([a-zA-Z_]\w*)/g, "[[$1]]");
   return result;
 }
 

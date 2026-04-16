@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude / AI tooling
+.claude/
+.agents/
+.superpowers/
+skills-lock.json
+
+# design system config
+.interface-design/
+
+# dev scripts & test output
+scripts/extraction-results.md
