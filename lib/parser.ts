@@ -1,7 +1,37 @@
 import { JSDOM } from "jsdom";
-import { chromium } from "playwright";
+import { chromium, type Browser } from "playwright";
 import type { TweetData, TweetType } from "./types";
 import { cleanText } from "./cleaner";
+
+// Browser singleton — launch once, reuse across requests
+let _browser: Browser | null = null;
+async function getBrowser(): Promise<Browser> {
+  if (!_browser || !_browser.isConnected()) {
+    _browser = await chromium.launch({ headless: true });
+  }
+  return _browser;
+}
+
+// Resource types to block — we only need the HTML/JS for content extraction
+const BLOCKED_RESOURCE_TYPES = new Set(["image", "media", "font", "stylesheet"]);
+const BLOCKED_URL_PATTERNS = [
+  "pbs.twimg.com",     // profile pics, media
+  "video.twimg.com",   // videos
+  "analytics",
+  "ads.",
+  "doubleclick",
+  "googlesyndication",
+  "google-analytics",
+  "branch.io",
+  "one-signal",
+  ".mp4",
+  ".jpg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".woff",
+  ".woff2",
+];
 
 /**
  * Extract article body preserving paragraph structure.
@@ -180,23 +210,84 @@ export function parseTweetHtml(html: string, source: string): TweetData {
 }
 
 export async function fetchTweetPage(url: string): Promise<string> {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  const browser = await getBrowser();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  // Block unnecessary resources to speed up page load
+  await page.route("**/*", (route, request) => {
+    if (BLOCKED_RESOURCE_TYPES.has(request.resourceType())) {
+      return route.abort();
+    }
+    const reqUrl = request.url();
+    if (BLOCKED_URL_PATTERNS.some((p) => reqUrl.includes(p))) {
+      return route.abort();
+    }
+    return route.continue();
+  });
+
+  // Listen for GraphQL response to detect article vs tweet before DOM renders.
+  // This avoids the 5s timeout penalty on every non-article tweet.
+  let graphqlResolved = false;
+  let isArticleFromApi = false;
+  const graphqlReady = new Promise<void>((resolve) => {
+    const timeout = setTimeout(() => { graphqlResolved = true; resolve(); }, 10000);
+    page.on("response", (response) => {
+      const rUrl = response.url();
+      if (rUrl.includes("/graphql/") && rUrl.includes("TweetResult")) {
+        response.json().then((json) => {
+          try {
+            const result = json?.data?.tweetResult?.result;
+            // Check note tweets that link to articles
+            const noteText = result?.note_tweet?.note_tweet_results?.result?.text;
+            if (noteText && noteText.includes("x.com/i/article/")) {
+              isArticleFromApi = true;
+            }
+            // Check card URLs pointing to articles
+            const card = result?.card?.legacy?.binding_values;
+            if (card) {
+              const cardUrl = card.find((b: { key: string }) => b.key === "card_url");
+              if (cardUrl?.value?.string_value?.includes("/i/article/")) {
+                isArticleFromApi = true;
+              }
+            }
+          } catch {
+            // Parse failed — fall back to DOM detection
+          }
+          if (!graphqlResolved) { graphqlResolved = true; clearTimeout(timeout); resolve(); }
+        }).catch(() => {
+          if (!graphqlResolved) { graphqlResolved = true; clearTimeout(timeout); resolve(); }
+        });
+      }
+    });
+  });
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-  // Wait for tweet container to render
-  await page.waitForSelector('[data-testid="tweet"]', { timeout: 15000 });
+  // Wait for tweet container and GraphQL response in parallel
+  await Promise.all([
+    page.waitForSelector('[data-testid="tweet"]', { timeout: 15000 }),
+    graphqlReady,
+  ]);
 
-  // If this is an article, wait for the article content to load
-  try {
-    await page.waitForSelector('[data-testid="twitterArticleReadView"]', { timeout: 5000 });
-  } catch {
-    // Not an article or article didn't load — continue with what we have
+  if (isArticleFromApi) {
+    // We know it's an article — wait for the content to render
+    try {
+      await page.waitForSelector('[data-testid="twitterArticleReadView"]', { timeout: 8000 });
+    } catch {
+      // Article didn't render — continue with what we have
+    }
+  } else {
+    // Not an article per API — quick DOM check in case we missed it
+    const articleEl = await page.$('[data-testid="twitterArticleReadView"]');
+    if (articleEl) {
+      // Already rendered, no wait needed
+    }
+    // No grace period — if it's not there, it's not an article
   }
 
   const html = await page.content();
-  await browser.close();
+  await context.close();
 
   return html;
 }

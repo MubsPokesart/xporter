@@ -1,179 +1,116 @@
 // scripts/benchmark.ts
-// Profile where time is spent in the extraction pipeline
+// Compare old vs new Playwright performance with more URLs for better signal
 import { chromium } from "playwright";
-import { JSDOM } from "jsdom";
 import { parseTweetHtml } from "../lib/parser";
+import { fetchTweetPage } from "../lib/parser";
 import { normalizeUrl } from "../lib/url";
-import { toMarkdown } from "../lib/markdown";
 
 const urls = [
-  "https://x.com/trq212/status/2044548257058328723",      // article
+  "https://x.com/trq212/status/2044548257058328723",        // article
   "https://x.com/shawmakesmagic/status/2044269097647779990", // tweet
   "https://x.com/akshay_pachaar/status/2043745099792953508", // article
+  "https://x.com/Hartdrawss/status/2040723680246833544",     // tweet
+  "https://x.com/alxfazio/status/2035417141659267174",       // thread
+  "https://x.com/sebgoddijn/status/2042285915435937816",     // article
 ];
 
-interface Timing {
-  url: string;
-  browserLaunch: number;
-  navigation: number;
-  waitForTweet: number;
-  waitForArticle: number;
-  getHtml: number;
-  browserClose: number;
-  jsdomParse: number;
-  extractContent: number;
-  toMarkdown: number;
-  total: number;
-  htmlSize: number;
-}
-
-async function profileUrl(url: string): Promise<Timing> {
-  const normalized = normalizeUrl(url);
-  const t: Record<string, number> = {};
-
-  // Phase 1: Browser launch
-  let mark = performance.now();
-  const browser = await chromium.launch({ headless: true });
-  t.browserLaunch = performance.now() - mark;
-
-  // Phase 2: New page + navigation
-  mark = performance.now();
-  const page = await browser.newPage();
-  await page.goto(normalized, { waitUntil: "domcontentloaded", timeout: 30000 });
-  t.navigation = performance.now() - mark;
-
-  // Phase 3: Wait for tweet selector
-  mark = performance.now();
-  await page.waitForSelector('[data-testid="tweet"]', { timeout: 15000 });
-  t.waitForTweet = performance.now() - mark;
-
-  // Phase 4: Wait for article (optional)
-  mark = performance.now();
-  try {
-    await page.waitForSelector('[data-testid="twitterArticleReadView"]', { timeout: 5000 });
-  } catch {
-    // Not an article
-  }
-  t.waitForArticle = performance.now() - mark;
-
-  // Phase 5: Get HTML
-  mark = performance.now();
-  const html = await page.content();
-  t.getHtml = performance.now() - mark;
-
-  // Phase 6: Close browser
-  mark = performance.now();
-  await browser.close();
-  t.browserClose = performance.now() - mark;
-
-  // Phase 7: JSDOM parse (isolated from parseTweetHtml to measure separately)
-  mark = performance.now();
-  const dom = new JSDOM(html);
-  void dom.window.document;
-  t.jsdomParse = performance.now() - mark;
-
-  // Phase 8: Content extraction + cleaning
-  mark = performance.now();
-  const data = parseTweetHtml(html, normalized);
-  t.extractContent = performance.now() - mark;
-
-  // Phase 9: Markdown generation
-  mark = performance.now();
-  const md = toMarkdown(data);
-  void md;
-  t.toMarkdown = performance.now() - mark;
-
-  const total = t.browserLaunch + t.navigation + t.waitForTweet + t.waitForArticle
-    + t.getHtml + t.browserClose + t.jsdomParse + t.extractContent + t.toMarkdown;
-
-  return {
-    url: normalized,
-    browserLaunch: t.browserLaunch,
-    navigation: t.navigation,
-    waitForTweet: t.waitForTweet,
-    waitForArticle: t.waitForArticle,
-    getHtml: t.getHtml,
-    browserClose: t.browserClose,
-    jsdomParse: t.jsdomParse,
-    extractContent: t.extractContent,
-    toMarkdown: t.toMarkdown,
-    total,
-    htmlSize: html.length,
-  };
-}
-
 function fmt(ms: number): string {
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
   if (ms < 1000) return `${ms.toFixed(0)}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function pct(ms: number, total: number): string {
-  return `${((ms / total) * 100).toFixed(1)}%`;
+async function oldFetch(url: string): Promise<{ html: string; ms: number }> {
+  const start = performance.now();
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForSelector('[data-testid="tweet"]', { timeout: 15000 });
+  try {
+    await page.waitForSelector('[data-testid="twitterArticleReadView"]', { timeout: 5000 });
+  } catch { /* not article */ }
+  const html = await page.content();
+  await browser.close();
+  return { html, ms: performance.now() - start };
+}
+
+async function newFetch(url: string): Promise<{ html: string; ms: number }> {
+  const start = performance.now();
+  const html = await fetchTweetPage(url);
+  return { html, ms: performance.now() - start };
 }
 
 async function main() {
-  console.log(`Profiling ${urls.length} URLs...\n`);
+  console.log("=".repeat(70));
+  console.log("PLAYWRIGHT OPTIMIZATION BENCHMARK (6 URLs)");
+  console.log("=".repeat(70));
 
-  const timings: Timing[] = [];
-
+  // OLD
+  console.log("\n--- OLD ---\n");
+  const oldResults: { author: string; ms: number; type: string }[] = [];
   for (const url of urls) {
+    const normalized = normalizeUrl(url);
     const author = url.split("/")[3];
-    console.log(`  Profiling ${author}...`);
-    const t = await profileUrl(url);
-    timings.push(t);
+    process.stdout.write(`  ${author}...`);
+    const { html, ms } = await oldFetch(normalized);
+    const data = parseTweetHtml(html, normalized);
+    oldResults.push({ author, ms, type: data.type });
+    console.log(` ${fmt(ms)} (${data.type})`);
   }
 
-  console.log("\n" + "=".repeat(80));
-  console.log("TIMING BREAKDOWN");
-  console.log("=".repeat(80));
+  // Warm up
+  console.log("\n  Warming up browser...");
+  await newFetch(normalizeUrl(urls[0]));
 
-  for (const t of timings) {
-    const author = t.url.split("/")[3];
-    console.log(`\n--- ${author} (${(t.htmlSize / 1024).toFixed(0)}KB HTML) ---`);
-    console.log(`  Browser launch:    ${fmt(t.browserLaunch).padStart(8)}  ${pct(t.browserLaunch, t.total).padStart(6)}`);
-    console.log(`  Navigation:        ${fmt(t.navigation).padStart(8)}  ${pct(t.navigation, t.total).padStart(6)}`);
-    console.log(`  Wait for tweet:    ${fmt(t.waitForTweet).padStart(8)}  ${pct(t.waitForTweet, t.total).padStart(6)}`);
-    console.log(`  Wait for article:  ${fmt(t.waitForArticle).padStart(8)}  ${pct(t.waitForArticle, t.total).padStart(6)}`);
-    console.log(`  Get HTML:          ${fmt(t.getHtml).padStart(8)}  ${pct(t.getHtml, t.total).padStart(6)}`);
-    console.log(`  Browser close:     ${fmt(t.browserClose).padStart(8)}  ${pct(t.browserClose, t.total).padStart(6)}`);
-    console.log(`  JSDOM parse:       ${fmt(t.jsdomParse).padStart(8)}  ${pct(t.jsdomParse, t.total).padStart(6)}`);
-    console.log(`  Extract content:   ${fmt(t.extractContent).padStart(8)}  ${pct(t.extractContent, t.total).padStart(6)}`);
-    console.log(`  To markdown:       ${fmt(t.toMarkdown).padStart(8)}  ${pct(t.toMarkdown, t.total).padStart(6)}`);
-    console.log(`  ────────────────────────────`);
-    console.log(`  TOTAL:             ${fmt(t.total).padStart(8)}`);
+  // NEW
+  console.log("\n--- NEW ---\n");
+  const newResults: { author: string; ms: number; type: string }[] = [];
+  for (const url of urls) {
+    const normalized = normalizeUrl(url);
+    const author = url.split("/")[3];
+    process.stdout.write(`  ${author}...`);
+    const { html, ms } = await newFetch(normalized);
+    const data = parseTweetHtml(html, normalized);
+    newResults.push({ author, ms, type: data.type });
+    console.log(` ${fmt(ms)} (${data.type})`);
   }
 
-  // Averages
-  const avg = (fn: (t: Timing) => number) =>
-    timings.reduce((sum, t) => sum + fn(t), 0) / timings.length;
+  // Comparison
+  console.log("\n" + "=".repeat(70));
+  console.log(`\n${"Author".padEnd(20)} ${"Type".padEnd(8)} ${"Old".padStart(8)} ${"New".padStart(8)} ${"Saved".padStart(8)}`);
+  console.log("-".repeat(56));
 
-  const avgTotal = avg((t) => t.total);
+  let totalOld = 0, totalNew = 0;
+  const byType: Record<string, { old: number[]; new: number[] }> = {};
+  for (let i = 0; i < urls.length; i++) {
+    const o = oldResults[i];
+    const n = newResults[i];
+    totalOld += o.ms;
+    totalNew += n.ms;
+    if (!byType[o.type]) byType[o.type] = { old: [], new: [] };
+    byType[o.type].old.push(o.ms);
+    byType[o.type].new.push(n.ms);
+    const saved = o.ms - n.ms;
+    console.log(
+      `${o.author.padEnd(20)} ${o.type.padEnd(8)} ${fmt(o.ms).padStart(8)} ${fmt(n.ms).padStart(8)} ${(saved > 0 ? "+" : "") + fmt(Math.abs(saved)).padStart(7)}`
+    );
+  }
 
-  console.log(`\n${"=".repeat(80)}`);
-  console.log("AVERAGES");
-  console.log("=".repeat(80));
-  console.log(`  Browser launch:    ${fmt(avg((t) => t.browserLaunch)).padStart(8)}  ${pct(avg((t) => t.browserLaunch), avgTotal).padStart(6)}`);
-  console.log(`  Navigation:        ${fmt(avg((t) => t.navigation)).padStart(8)}  ${pct(avg((t) => t.navigation), avgTotal).padStart(6)}`);
-  console.log(`  Wait for tweet:    ${fmt(avg((t) => t.waitForTweet)).padStart(8)}  ${pct(avg((t) => t.waitForTweet), avgTotal).padStart(6)}`);
-  console.log(`  Wait for article:  ${fmt(avg((t) => t.waitForArticle)).padStart(8)}  ${pct(avg((t) => t.waitForArticle), avgTotal).padStart(6)}`);
-  console.log(`  Get HTML:          ${fmt(avg((t) => t.getHtml)).padStart(8)}  ${pct(avg((t) => t.getHtml), avgTotal).padStart(6)}`);
-  console.log(`  Browser close:     ${fmt(avg((t) => t.browserClose)).padStart(8)}  ${pct(avg((t) => t.browserClose), avgTotal).padStart(6)}`);
-  console.log(`  JSDOM parse:       ${fmt(avg((t) => t.jsdomParse)).padStart(8)}  ${pct(avg((t) => t.jsdomParse), avgTotal).padStart(6)}`);
-  console.log(`  Extract content:   ${fmt(avg((t) => t.extractContent)).padStart(8)}  ${pct(avg((t) => t.extractContent), avgTotal).padStart(6)}`);
-  console.log(`  To markdown:       ${fmt(avg((t) => t.toMarkdown)).padStart(8)}  ${pct(avg((t) => t.toMarkdown), avgTotal).padStart(6)}`);
-  console.log(`  ────────────────────────────`);
-  console.log(`  TOTAL:             ${fmt(avgTotal).padStart(8)}`);
+  console.log("-".repeat(56));
+  const n = urls.length;
+  console.log(
+    `${"TOTAL".padEnd(20)} ${"".padEnd(8)} ${fmt(totalOld).padStart(8)} ${fmt(totalNew).padStart(8)} ${("+" + fmt(totalOld - totalNew)).padStart(8)}`
+  );
+  console.log(
+    `${"AVG".padEnd(20)} ${"".padEnd(8)} ${fmt(totalOld / n).padStart(8)} ${fmt(totalNew / n).padStart(8)} ${("+" + fmt((totalOld - totalNew) / n)).padStart(8)}`
+  );
 
-  // Breakdown: browser vs network vs processing
-  const browserTime = avg((t) => t.browserLaunch + t.browserClose);
-  const networkTime = avg((t) => t.navigation + t.waitForTweet + t.waitForArticle + t.getHtml);
-  const processTime = avg((t) => t.jsdomParse + t.extractContent + t.toMarkdown);
-
-  console.log(`\n  CATEGORY SUMMARY:`);
-  console.log(`  Browser (launch+close):  ${fmt(browserTime).padStart(8)}  ${pct(browserTime, avgTotal).padStart(6)}`);
-  console.log(`  Network (nav+wait+get):  ${fmt(networkTime).padStart(8)}  ${pct(networkTime, avgTotal).padStart(6)}`);
-  console.log(`  Processing (parse+md):   ${fmt(processTime).padStart(8)}  ${pct(processTime, avgTotal).padStart(6)}`);
+  // By type
+  console.log("\nBy type:");
+  for (const [type, data] of Object.entries(byType)) {
+    const avgOld = data.old.reduce((a, b) => a + b, 0) / data.old.length;
+    const avgNew = data.new.reduce((a, b) => a + b, 0) / data.new.length;
+    console.log(`  ${type.padEnd(8)} avg old=${fmt(avgOld)}, avg new=${fmt(avgNew)}, saved=${fmt(avgOld - avgNew)} (${((1 - avgNew / avgOld) * 100).toFixed(0)}%)`);
+  }
 
   process.exit(0);
 }
