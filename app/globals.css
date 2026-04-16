@@ -5,8 +5,8 @@
   --color-surface: #111111;
   --color-ink: #e5e5e5;
   --color-ink-2: rgba(255, 255, 255, 0.5);
-  --color-ink-3: rgba(255, 255, 255, 0.25);
-  --color-ink-4: rgba(255, 255, 255, 0.15);
+  --color-ink-3: rgba(255, 255, 255, 0.48);
+  --color-ink-4: rgba(255, 255, 255, 0.35);
   --color-grid: rgba(180, 200, 255, 0.04);
   --color-border: rgba(255, 255, 255, 0.06);
   --color-border-emphasis: rgba(255, 255, 255, 0.12);
