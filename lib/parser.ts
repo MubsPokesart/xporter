@@ -1,4 +1,5 @@
 import { JSDOM } from "jsdom";
+import { chromium } from "playwright";
 import type { TweetData, TweetType } from "./types";
 
 export function parseTweetHtml(html: string, source: string): TweetData {
@@ -56,4 +57,19 @@ export function parseTweetHtml(html: string, source: string): TweetData {
     topics,
     mentions,
   };
+}
+
+export async function fetchTweetPage(url: string): Promise<string> {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
+  await page.goto(url, { waitUntil: "networkidle" });
+
+  // Wait for tweet content to render
+  await page.waitForSelector('[data-testid="tweetText"]', { timeout: 15000 });
+
+  const html = await page.content();
+  await browser.close();
+
+  return html;
 }
