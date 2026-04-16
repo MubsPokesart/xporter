@@ -1,26 +1,49 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-void: #0a0a0a;
+  --color-surface: #111111;
+  --color-ink: #e5e5e5;
+  --color-ink-2: rgba(255, 255, 255, 0.5);
+  --color-ink-3: rgba(255, 255, 255, 0.25);
+  --color-ink-4: rgba(255, 255, 255, 0.15);
+  --color-grid: rgba(180, 200, 255, 0.04);
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-emphasis: rgba(255, 255, 255, 0.12);
+  --color-border-focus: rgba(255, 255, 255, 0.5);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Courier New", "Cascadia Code", monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.graph-grid {
+  background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 31px,
+      var(--color-grid) 31px,
+      var(--color-grid) 32px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 31px,
+      var(--color-grid) 31px,
+      var(--color-grid) 32px
+    );
+}
+
+/* Hide scrollbars */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
 }
